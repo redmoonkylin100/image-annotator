@@ -1,12 +1,13 @@
 # 图片快速标注工具（image-annotator）
 
-基于 **PyQt6** 的 Windows 桌面图片快速标注工具。面向「在图片四周加引线标注 / 序号 / 文本 / 形状 / 手绘」的高频场景，内置磁吸对齐、一键自动布局、图层、历史、明暗主题、自动保存、透明背景导出等能力。
+基于 **PyQt6** 的 Windows 桌面图片快速标注工具。面向「在图片四周加引线标注 / 序号 / 文本 / 形状 / 手绘」的高频场景，内置磁吸对齐、一键自动布局、图层结构树、撤销重做、明暗主题、自动保存、透明背景导出等能力。
 
 - 语言：Python 3.13（最低 3.10+，使用了 `X | None` 类型注解）
 - GUI 框架：PyQt6（开发版本 6.10.2，requirements 要求 >=6.6）
 - 仅依赖：`PyQt6`、`Pillow`（其余全部标准库）
 - 入口：`python main.py`
 - 应用名：图片标注大师；组织名：LocalTools
+- 版本：窗口标题与关于对话框均为 **v2.0**；功能已推进到 v2.1（见 §23），版本号未再上调
 
 ---
 
@@ -17,11 +18,11 @@ py -3.13 -m venv venv                                  # ① 建虚拟环境
 venv\Scripts\python.exe -m pip install -r requirements.txt pyinstaller -i https://mirrors.aliyun.com/pypi/simple/
                                                        # ② 装依赖（国内镜像，PyQt6+Pillow+PyInstaller）
 venv\Scripts\python.exe main.py                       # ③ 源码运行
-venv\Scripts\python.exe 一键打包.py --debug            # ④ 打包：dist\图片标注工具.exe（单文件、无控制台）
+venv\Scripts\python.exe 一键打包.py --debug            # ④ 打包：dist\图片标注大师.exe（单文件、无控制台）
 ```
 
-- **一键打包.py**：双击即用 venv 的 PyInstaller 打包（自动用 pythonw 后台静默执行、无 cmd 黑窗，日志写「打包日志.txt」；`--debug` 参数可实时看日志）；产物 `dist\图片标注工具.exe` 为独立单文件（onefile）、`console=False` 不弹黑框。
-- **双图标**：exe 文件图标嵌入 `1.ico`（spec `icon='1.ico'`）；`2.ico` 与 `1.ico` 一起经 spec `datas` 嵌入 exe，运行时 `_resource_path()` 从嵌入资源取图，窗口/任务栏/系统托盘统一显示 `2.ico`（缺失时回退 `1.ico`）。打包后 exe **不再依赖外部 ico 文件**。
+- **一键打包.py**：双击即用 venv 的 PyInstaller 打包（自动用 pythonw 后台静默执行、无 cmd 黑窗，日志写「打包日志.txt」；`--debug` 参数可实时看日志）；产物名以 spec 的 `name` 为准，当前为 `dist\图片标注大师.exe`，独立单文件（onefile）、`console=False` 不弹黑框。注意：`一键打包.py` 里的产物检查常量仍写 `图片标注工具.exe`（历史遗留，见 §16.20），打包成功后会提示「未找到产物」。
+- **双图标 + 二维码**：exe 文件图标嵌入 `1.ico`（spec `icon='1.ico'`）；`2.ico` 与 `1.ico` 一起经 spec `datas` 嵌入 exe，运行时 `_resource_path()` 从嵌入资源取图，窗口/任务栏/系统托盘**优先 `1.ico`、缺失时回退 `2.ico`**。关于对话框的 `明亮.png` / `暗黑.png` 也由 spec `datas` 嵌入（v2.0），运行时按主题选图，找不到时回退另一张/显示「二维码」占位文字。打包后 exe **不再依赖外部 ico/png 文件**。
 - **数据目录**：打包后所有持久化数据（`autosave/`、`settings.json`、`items.json`、`image.png` 等）一律写在 **exe 所在目录**（源码运行时为项目根目录），**不写用户目录、不写系统临时目录**（`settings._app_base_dir` / `autosave._app_base_dir` 的 frozen 分支返回 `dirname(sys.executable)`，已实测验证）。
 
 ---
@@ -32,22 +33,27 @@ venv\Scripts\python.exe 一键打包.py --debug            # ④ 打包：dist\�
 image-annotator/
 ├── main.py                     # 入口：安装 C 层 stderr 过滤器 → QApplication → MainWindow
 ├── requirements.txt            # PyQt6>=6.6, Pillow>=10.0
-├── 1.ico                       # exe 文件图标（spec icon= 嵌入）
-├── 2.ico                       # 窗口/任务栏/托盘图标（spec datas 嵌入）
-├── 图片标注工具.spec            # PyInstaller 配置（单文件、无控制台、icon=1.ico、datas=两个 ico）
+├── 1.ico                       # exe 文件图标（spec icon= 嵌入），运行时窗口/托盘优先使用
+├── 2.ico                       # 备用窗口/托盘图标（1.ico 缺失时回退）
+├── 明亮.png / 暗黑.png          # 关于对话框二维码（随明/暗主题切换，spec datas 嵌入）
+├── 图片标注工具.spec            # PyInstaller 配置（单文件、无控制台、icon=1.ico、datas=双 ico + 双二维码图）
 ├── 一键打包.py                 # 使用 venv 的 PyInstaller 一键打包（双击静默、日志打包日志.txt）
 ├── venv/                       # 虚拟环境（PyQt6/Pillow/PyInstaller，国内镜像安装）
 ├── README.md
 ├── annotator/
-│   ├── __init__.py
-│   ├── window.py              # 主窗口：主工具栏、可停靠工具面板、主题、托盘、左侧面板、项目存取、信号接线
-│   ├── canvas.py              # 画布：坐标变换、9 种模式鼠标交互 + 截图动作接线、磁吸、自动布局、撤销重做、就地输入、导出渲染
-│   ├── items.py               # 元素：Layer/AnnotationItem/LeaderLineItem/TextItem/ShapeItem/PenItem/HighlightItem/MosaicItem/EmojiItem + 形状路径
-│   ├── panel.py               # 右侧样式面板：CollapsibleBox 折叠组 + StylePanel（引线/文字/画布/形状/画笔/荧光笔/马赛克/表情/截图设置/导出 10 组）
+│   ├── __init__.py            # 包声明
+│   ├── window.py              # 主窗口：工具栏、可停靠/可嵌入工具面板、主题、托盘、左侧结构树、项目存取、信号接线、关于对话框
+│   ├── canvas.py              # 画布：坐标变换、9 种模式鼠标交互 + 截图动作接线、磁吸、自动布局、撤销重做、就地输入、手柄/尾尖编辑、导出渲染
+│   ├── items.py               # 元素：Layer/AnnotationItem/LeaderLineItem/TextItem/ShapeItem/PenItem/HighlightItem/MosaicItem/EmojiItem/ImageItem + 69 种形状路径
+│   ├── callout_geom.py        # 标注类形状尾巴几何（最近边、根点钳制、椭圆弧、默认尾尖），纯函数、不依赖 QPainter
+│   ├── flatten.py             # BelowFlattener：按绘制顺序离屏合成「马赛克下方全部内容」，供马赛克取源
+│   ├── panel.py               # 右侧样式面板：CollapsibleBox 折叠组 + StylePanel（引线/文字/画布/形状/画笔/荧光笔/马赛克/表情/截图/导出 10 组；形状按 7 类折叠网格）
 │   ├── screenshot.py          # 自由截图：ScreenshotOverlay 全屏框选遮罩（独立模块，见 §18）
-│   ├── layers_panel.py        # 图层面板（增删/显隐/拖拽排序/右键重命名/选中本层）
-│   ├── history_panel.py       # 历史面板（按创建顺序列元素，单击选中、双击改字、右键菜单）
+│   ├── layer_tree_panel.py    # 图层结构树：图层/元素混合树、拖拽重排与改归属、右键菜单（增删/重命名/置顶置底/复制层/折叠展开）、主题配色
+│   ├── layers_panel.py        # 旧版扁平图层面板（历史实现，主窗口已不挂载，仅保留代码）
+│   ├── history_panel.py       # 旧版元素历史列表（历史实现，主窗口已不挂载，仅保留代码）
 │   ├── autosave.py            # 自动保存 + 元素/图层序列化/反序列化 + .anno 项目读写基础
+│   ├── menu_qss.py            # QMenu 明暗主题 QSS + apply_menu_theme()（QMenu 不继承应用级样式表）
 │   ├── settings.py            # settings.json 读写（界面/样式参数持久化）
 │   └── rulers.py              # 水平/垂直标尺 RulerBar
 └── autosave/                  # 运行时自动生成（源码运行在项目根；打包后在 exe 同目录）
@@ -55,7 +61,7 @@ image-annotator/
     ├── items.json             # 自动恢复：元素 + 图层
     └── image.png              # 自动恢复：上次图片
 
-打包相关：`dist/图片标注工具.exe`（产物）、`build/`（中间文件）、`打包日志.txt`（一键打包日志，可删除）。
+打包相关：`dist/图片标注大师.exe`（产物，名称取 spec 的 `name`）、`build/`（中间文件）、`打包日志.txt`（一键打包日志，可删除）。
 `tests/smoke_test*.py` 是历次迭代的离屏回归脚本，不属于运行时依赖。
 
 > `tests/smoke_test*.py` 是历次迭代的离屏回归脚本，不属于运行时依赖。
@@ -67,8 +73,8 @@ image-annotator/
 ```
 MainWindow (window.py)
  ├─ 顶部 QToolBar「主工具栏」（打开/保存/撤销/导出/主题…）
- ├─ QSplitter(水平)
- │   ├─ left_box   ：HistoryPanel(上) + LayerPanel(下)，用垂直 QSplitter 分高度
+ ├─ QSplitter(水平)，分隔条宽 6px（v2.0）
+ │   ├─ left_box   ：LayerTreePanel（图层结构树，单列）
  │   ├─ center_box ：左上角块 + 水平标尺 + 垂直标尺 + AnnotationCanvas
  │   └─ right_box  ：QScrollArea 包裹 StylePanel（10 个 CollapsibleBox）
  └─ QDockWidget「tool_dock」：模式切换工具面板（可停靠/浮动，见 §7）
@@ -77,7 +83,7 @@ MainWindow (window.py)
 关键关系：
 
 1. `StylePanel` 是**样式提供者**：`canvas.set_style_provider(panel.current_style)`，画布每次新建元素时调用 `self.style_provider()` 拿到当前样式 dict（`canvas._new_style()`）。
-2. 画布通过 **pyqtSignal** 向外通知：`imageLoaded / itemSelectionChanged / itemsChanged / cursorMoved(x,y) / modeChanged / viewChanged / layersChanged`，主窗口在 `_connect_signals()` 里接线，驱动历史/图层/状态栏刷新与自动保存。
+2. 画布通过 **pyqtSignal** 向外通知：`imageLoaded / itemSelectionChanged / itemsChanged / cursorMoved(x,y) / modeChanged / viewChanged / layersChanged`，主窗口在 `_connect_signals()` 里接线，驱动图层结构树/状态栏刷新与自动保存。
 3. 所有元素坐标都是**图片坐标**（原点在原图左上角、单位像素，与导出一致）；画布负责 `view = image*scale + offset` 双向变换：`view_to_image()` / `image_to_view()`，缩放 `wheelEvent`、平移（中键/右键）。
 4. 任何改动走**撤销栈**：改动前 `push_undo(tag)` 对 `self.items` 做深拷贝快照（`MAX_UNDO=100`），Ctrl+Z/Y 撤销重做。
 
@@ -130,13 +136,16 @@ MainWindow (window.py)
 
 ### 3.4 TextItem / ShapeItem / PenItem
 - **TextItem**：纯文本批注，无引线，`pos` 即左上角，可自由拖。
-- **ShapeItem**：形状，`p1/p2` 对角点 + `shape` 类型 + 边框/填充色 + 线宽。11 种形状由 `shape_path(shape, rect)` 生成 QPainterPath：矩形/圆角矩形/椭圆/三角形/直角三角形/菱形/五边形/六边形/五角星/右箭头，多边形都 `closeSubpath()` 保证封闭；非法 NaN 几何兜底为矩形。**空心弧（SHAPE_OPEN_ARC，r31 修复）**为 270° 环形扇段（Office Block Arc 风格的粗 C 形弧带，外弧 + 端面 + 反向内弧 + 闭合，内圈为外框 52%）；**空 QPainterPath 直接 `arcTo` 会先从 (0,0) 拉一条直线到弧起点**（旧实现因此被扯到画布左上角、形成细长三角），必须先 `moveTo(外弧起点)`，内外弧端点用与 arcTo 相同的角度公式（`x=cx+rx·cosθ, y=cy−ry·sinθ`）精确对齐。**直线（SHAPE_LINE）不走 shape_path**：严格 `moveTo(p1)→lineTo(p2)`（r23 前用归一化矩形对角线，往右上/左下拖会被换成另一条对角线、起点看似乱跑，已修）；hit_test 逐段点到线段距离。r23 起直线为**点击式连续折线**：多点时存 `points: list[QPointF]`（≥2 逐段 drawPolyline，rect()=全部顶点 boundingRect、move_by 整体平移），两点直线 points=None、仅用 p1/p2；序列化时仅 ≥3 点写 `line_points`，两点保持旧格式。
+- **ShapeItem**：形状，`p1/p2` 对角点 + `shape` 类型 + 边框/填充色 + 线宽 + `rotation`。v2.1 共 **69 种**形状（7 大类：基本形状 25 / 箭头汇总 11 / 公式形状 6 / 流程图 4 / 星与旗帜 12 / 标注 7 / 括号 4），由 `shape_path(shape, rect, tail=None)` 生成 QPainterPath：矩形/圆角矩形/椭圆/三角形/直角三角形/菱形/五边形/六边形/五角星/右箭头及箭头、心形、云朵、星形、括号、流程、卷轴、旗帜等，多边形都 `closeSubpath()` 保证封闭；非法 NaN 几何兜底为矩形。**空心弧（SHAPE_OPEN_ARC，r31 修复）**为 270° 环形扇段（Office Block Arc 风格的粗 C 形弧带，外弧 + 端面 + 反向内弧 + 闭合，内圈为外框 52%）；**空 QPainterPath 直接 `arcTo` 会先从 (0,0) 拉一条直线到弧起点**（旧实现因此被扯到画布左上角、形成细长三角），必须先 `moveTo(外弧起点)`，内外弧端点用与 arcTo 相同的角度公式（`x=cx+rx·cosθ, y=cy−ry·sinθ`）精确对齐。**直线（SHAPE_LINE）不走 shape_path**：严格 `moveTo(p1)→lineTo(p2)`（r23 前用归一化矩形对角线，往右上/左下拖会被换成另一条对角线、起点看似乱跑，已修）；hit_test 逐段点到线段距离。r23 起直线为**点击式连续折线**：多点时存 `points: list[QPointF]`（≥2 逐段 drawPolyline，rect()=全部顶点 boundingRect、move_by 整体平移），两点直线 points=None、仅用 p1/p2；序列化时仅 ≥3 点写 `line_points`，两点保持旧格式。
+- **v2.0 形状内嵌文字（含直线）**：`text_content` 直接复用文字块字段（字体/字号/颜色/粗斜体/上下标），`text_pos ∈ center/top/bottom` 控制垂直位置、水平恒居中，绘制在 `_paint_shape_text()`（形状路径之后、随 `rotation` 一起旋转）；选择模式下**双击形状本体**进入就地编辑（`edit_anchor()` 返回包围盒中心），空文本允许。面板「形状设置」的「文字位置」下拉与 `current_style.shape_text_pos` 双向同步，随 autosave 持久化。
+- **v2.1 标注类形状尾巴**：`CALLOUT_SHAPES`（对话气泡/矩形/菱形/燕尾/上卷/云形/椭圆标注）使用 `tail_apex`（**未旋转图片坐标**中的绝对尾尖点）而非固定比例；`tail_x/tail_len` 仅兼容旧存档并在首次访问时迁移。几何计算全部交给 `callout_geom.py`：`nearest_edge()` 找距尾尖最近的多边形边、`edge_roots()` 把两个根点钳制在边内并让根心向边中点回收、`ellipse_roots()` 用椭圆切向量取弧上根点；尾尖可在主体四周任意位置拖动，**主体 p1/p2 尺寸不变形**。
 - **PenItem**：自由手绘，`points: list[QPointF]` + 颜色 + 线宽。
 
 ### 3.5 HighlightItem / MosaicItem / EmojiItem（本轮新增）
 - **HighlightItem（荧光笔）**：半透明粗自由曲线。`points: list[QPointF]` + `hl_color`(QColor 基色) + `hl_width`(默认22) + `hl_alpha`(0–255，面板按不透明度%换算，默认31%≈79)。圆头圆角 `drawPolyline`（CapRound/JoinRound），单点也画圆点；hit_test 用点到线段距离+半宽；move_by 平移所有点；export_bounds=点 bbox+半宽。
-- **MosaicItem（马赛克）**：`p1/p2` 对角点 + `block_size`(默认10) + `show_border`(bool，默认 True，是否绘制马赛克区域边框；选中提示框由基类 paint_selection 负责，与此独立)。**元素自身不持有原图**：`_source` 字段由画布在绘制时**惰性注入**当前 `canvas.pixmap`（`_paint_layers/_paint_layers_export` 里发现 `_source is not self.pixmap` 就 `set_source`），反序列化/撤销恢复后无需在各入口补绑定。`_render_mosaic()`：从原图 copy 交集整数 QRect → 缩小到 w//block → 最近邻(FastTransformation)放大回原尺寸。无原图时画半透明灰占位。**必须实现 `__deepcopy__` 且其中 `_source=None`**（QPixmap 不可 pickle，否则撤销快照崩溃，见 §16）。
+- **MosaicItem（马赛克）**：`p1/p2` 对角点 + `block_size`(默认10) + `show_border`(bool，默认 True，是否绘制马赛克区域边框；选中提示框由基类 paint_selection 负责，与此独立)。**元素自身不持有原图**：`_source` 字段由画布在绘制时**惰性注入**当前马赛克源——无其它马赛克时就是 `canvas.pixmap`，存在马赛克时换成 `flatten.BelowFlattener` 的**下方全部内容快照**（底图 + 下层元素，含导入截图 ImageItem），屏幕与导出两条绘制路径一致；反序列化/撤销恢复后无需在各入口补绑定。`_render_mosaic()`：从源图 copy 交集整数 QRect → 缩小到 w//block → 最近邻(FastTransformation)放大回原尺寸。无原图时画半透明灰占位。**必须实现 `__deepcopy__` 且其中 `_source=None`**（QPixmap 不可 pickle，否则撤销快照崩溃，见 §16）。
 - **EmojiItem（表情）**：`pos`（包围盒**中心**）+ `emoji` 字符 + `font_size`(默认40)。字体 `setFamilies(["Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji","Microsoft YaHei","sans-serif"])` 渲染彩色 emoji；text_rect 用 QFontMetrics 计算并以 pos 为中心；单击放置。
+- **ImageItem（图片元素，v2.x）**：`p1/p2` 对角点 + `_pm` 像素内容；支持 8 点缩放/旋转/拖动，可跨图层。`__deepcopy__` 对 QPixmap 复用隐式共享引用（不深拷贝），序列化走 base64 PNG。截图载入、粘贴图片、打开图片都可选择「作为主图」或「作为新图层元素」插入（`canvas.add_image_element()` 会自动建「图片」图层并等比缩放到画布中心）。
 
 ---
 
@@ -159,7 +168,7 @@ MainWindow (window.py)
 - 进入模式自动展开对应组（`MODE_GROUP`：…/highlight→highlight、mosaic→mosaic、emoji→emoji；**screenshot 不在其中**）。
 - set_mode 光标默认 CrossCursor，但 `mode ∈ (SELECT, PEN, HIGHLIGHT)` 用 ArrowCursor；set_mode 清空各模式临时拖拽状态。
 - **设置组 ↔ 工具模式双向联动**：进入模式会程序化展开对应组（`MODE_GROUP`，见上）；反向，用户**手动点开**某功能设置组、或**操作该组控件**（改数值/选色/选表情）时，面板发 `groupActivated(key)`，主窗口按 `GROUP_MODE` 反向映射自动切到对应工具（leader/text/shape/pen/highlight/mosaic/emoji；canvas/screenshot/export 不对应画布模式，不切）。程序化 `expand_group` 用 `CollapsibleBox._programmatic` 抑制信号、选中回填/设置恢复用 `StylePanel._syncing` 抑制，二者共同保证不产生回环、不在回填时误切模式。**引线设置组固定映射到「引线标注」MODE_LEADER（不是引线序号）**：展开引线组、或操作引线主样式控件（线宽/箭头/端点/间隙/标注风格/横线上下方/引线颜色）都会切到引线标注；但序号专属控件（启用序号、序号格式）不触发切换，避免在序号模式下被跳走。文字设置组同时服务引线与文本，其控件不强制切模式。
-- 序号开关 `number_enabled`、格式 `number_format`；`reorder_by_number()` 支持历史面板调整序号顺序。
+- 序号开关 `number_enabled`、格式 `number_format`；`reorder_by_number()` 按新序号重排引线顺序（图层树右键「编辑序号…」→ `window._edit_item_number` 调用）。
 - 就地输入框 `_InlineEditor(QLineEdit)`：回车/失焦确认、Esc 取消；失焦确认会置 `_suppress_click` 吞掉紧跟的同一次点击。
 
 ---
@@ -206,7 +215,7 @@ MainWindow (window.py)
 | 中键按住拖动 | 平移画布 |
 | 右键按下 | 记录按下点；**发生位移（>4px）立即进入平移画布（零延迟，v1.7）**；未位移的短按释放才在选择模式弹分类菜单；从指令模式切换来的首次释放不弹菜单 |
 | 滚轮 | 以鼠标为锚点缩放 |
-| 双击文字 | 进入就地编辑（改文字内容） |
+| 双击文字/形状 | 文字/引线进入就地编辑；形状（含直线，v2.0）双击本体编辑内嵌文字；上述引线（旧 above 风格）双击是切换横线方向 |
 
 ### 6.2 画布快捷键
 V 选择 / L 引线 / N 序号 / T 文本 / R 形状 / P 画笔；Delete 删除；Esc 取消待操作（**连续折线绘制中 Esc/回车只结束当前折线、保留已确认部分，不切换工具**）；Ctrl+Z/Y 撤销重做（主工具栏绑定，见 §9）。
@@ -232,7 +241,7 @@ V 选择 / L 引线 / N 序号 / T 文本 / R 形状 / P 画笔；Delete 删除�
 一个 `QDockWidget`，内含 `tool_widget` + 一个 `QBoxLayout`（`tool_layout`），成员为：`float_btn("⧉")` + 10 个模式按钮 + 末尾 addStretch(1)。
 
 ### 7.1 模式按钮（符号 + tooltip，不重复）
-👆选择 / ↗️引线标注 / 🔢引线序号 / 🔤文本批注 / ⬜形状 / ✏️画笔 / 🖍️荧光笔(占位) / 🧱马赛克(占位) / 😀表情(占位) / ✂️自由截图(占位)。后四个仅占位、未实现功能。
+👆选择 / ↗️引线标注 / 🔢引线序号 / 🔤文本批注 / 🔺形状 / ✏️画笔 / 🖍️荧光笔 / 🧱马赛克 / 😀表情 / ✂️自由截图。10 个按钮均可用（无占位项）；最后一个是即时动作（非模式），点击直接进入截图流程。
 
 ### 7.2 方向规则（`_do_update_tool_layout_orientation`，必须严格遵守）
 - **浮动**：始终**单行横排**，显示完整标题栏（可拖动/关闭/浮动），隐藏 ⧉。
@@ -261,10 +270,11 @@ V 选择 / L 引线 / N 序号 / T 文本 / R 形状 / P 画笔；Delete 删除�
 
 - 右侧面板顶部（滚动区外，固定常显）有一个「▲ 折叠全部 / ▼ 展开全部」按钮（`MainWindow.collapse_all_btn`）：点击一次全部折叠、再点全部展开；内部走 `StylePanel.collapse_all()/expand_all()` 程序化 `set_expanded`，**不触发工具模式切换**。按钮文案由 `_sync_collapse_all_btn()` 按当前状态自动同步（`StylePanel.groupsChanged` 信号：用户手动折叠/展开、切换模式联动展开、恢复设置都会刷新），配色随明/暗主题切换（`_apply_collapse_btn_theme`）。
 
+- 形状设置（v2.0 起）：按 **7 大类**折叠网格铺开 69 种形状（基本形状/箭头汇总/公式形状/流程图/星与旗帜/标注/括号），每个形状为 30×30 图标按钮、悬停显示中文名；边线颜色 / 填充颜色（各带「透明」复选框，勾选即 alpha=0 隐藏）→ 线宽(1–20,默认2) → **文字位置**下拉（居中/上方/下方，v2.0 形状内嵌文字）。
 - 荧光笔设置：6 预设色块（#FFE600/#54FF00/#FF5CA8/#33CCFF/#FF9500/#C77DFF，`_set_hl_preset`）+ 自定义颜色 + 粗细(3–100,默认22) + 不透明度%(5–100,默认31)。
 - 马赛克设置：块大小(3–50,默认10) + 「显示马赛克边框」QCheckBox(默认勾选，mosaic_border)。
 - 表情设置：24 个 emoji 的 QGridLayout（每行8个、30×30 checkable，闭包 `_pick_emoji` 记录 `self._emoji_char` 互斥高亮）+ 大小(12–160,默认40)。
-- 截图设置：QKeySequenceEdit(默认 Ctrl+Q) + 「复制到剪贴板」「载入画布」QCheckBox(默认均开) +「立即截图」按钮(发 screenshotRequested)。
+- 截图设置：QKeySequenceEdit(默认 Ctrl+Q) + 「完成后复制到剪贴板」(默认开) + 「完成后载入画布继续标注」(默认**关**，v1.7 起避免每次截图弹覆盖提示) +「立即截图」按钮 + 边框选项（「无边框」默认勾选、边框线宽 1–30 默认 2、边框颜色默认 #2F80ED）。
 
 ### 8.1 CollapsibleBox 折叠组
 QToolButton 标题（箭头 Right/Down）+ 可折叠内容区。**标题三色随主题/状态变化**（`_apply_title_style`）：
@@ -279,7 +289,7 @@ QToolButton 标题（箭头 Right/Down）+ 可折叠内容区。**标题三色�
 - **暗黑主题复选框白色化（`StylePanel.set_dark_theme`）**：`__init__` 末尾一次性收集全部 QCheckBox 到 `self._checkboxes`；暗黑主题下逐控件设置 QSS——未选态 1px **蓝色边框 #5AA8FF**（hover 橙 `#FFA94D`）+ 深色底（#3d3d3d），选中态**白色填充** + 深色对勾。注意：QSS 一旦自定义 `::indicator`，Qt 不再绘制原生对勾，因此对勾图案由 `_checked_icon_path(color, name)` 用 QPainter 按颜色参数化生成一次深色对勾 PNG（存 autosave/_check_dark.png）并经 `image: url(...)` 注入；明亮主题 `setStyleSheet("")` 清空、恢复原生样式。
 
 ### 8.2 current_style() 返回字段（新建元素的样式来源）
-`line_color, line_width, arrow_size, endpoint_style, label_style, above_dir, text_gap, above_gap, text_color, font_size, font_family, font_weight, font_italic, script, bg_enabled, bg_fill_color, bg_border_color, shape_type, shape_border_color, shape_fill_color, shape_line_width, pen_color, pen_width`，再加本轮新增：`hl_color(QColor), hl_width, hl_alpha(0–255), mosaic_block, mosaic_border(bool), emoji_char, emoji_size, screenshot_shortcut(str), screenshot_clipboard(bool), screenshot_canvas(bool)`。（r23：引线新增 `above_gap` 上下间隙。）
+`line_color, line_width, arrow_size, endpoint_style, label_style, above_dir, text_gap, above_gap, text_color, font_size, font_family, font_weight, font_italic, script, bg_enabled, bg_fill_color, bg_border_color, shape_type, shape_border_color, shape_fill_color, shape_line_width, shape_text_pos, pen_color, pen_width`，再加 v1.5/v1.7/v2.x 新增：`hl_color(QColor), hl_width, hl_alpha(0–255), mosaic_block, mosaic_border(bool), emoji_char, emoji_size, screenshot_shortcut(str), screenshot_clipboard(bool), screenshot_canvas(bool), screenshot_border_w, screenshot_no_border(bool), screenshot_border_color(str)`。（r23：引线新增 `above_gap` 上下间隙。）
 - 每个新字段都要在 4 处同步：current_style() 产出、_apply_to_selection() 应用到选中、sync_from_selection() 回填、set_style() 从 settings 回填；颜色值在 current_style 里直接放 QColor 对象。
 - 注意：`bg_enabled = 背景框勾选 且 label_style==box`（新 4 样式下背景框由「文字设置」独立控制，不再被引线样式强制关闭）。
 - 引线设置内含：线型/颜色/线宽/箭头大小/端点样式/引线样式下拉/横线方向/「空白间隙」text_gap_spin（原「文字间隙」，r23 改名，键名仍 text_gap，0–20、后缀 px、默认 5）/「上下间隙」above_gap_spin（r23 新增，文字在横线上/下方时与横线的垂直间隙，0–20、默认 5），两者 valueChanged 均实时生效并回填选中项。
@@ -291,24 +301,24 @@ QToolButton 标题（箭头 Right/Down）+ 可折叠内容区。**标题三色�
 
 ## 9. 主工具栏与快捷键（window.py）
 
-全部用图标（Qt 标准图标），hover 显示中文 tooltip。动作与快捷键（v1.7 按功能重排，从左到右）：
+按钮以 Qt 标准图标为主，撤销/重做（↶/↷）、100%（⛶）、对齐（⊞）为符号按钮；hover 均显示中文 tooltip。动作与快捷键（v1.7 按功能重排，从左到右）：
 
 | 位置 | 动作 | 快捷键 | 说明 |
 |---|---|---|---|
 | 1 | 新建空白 | — | 新建空白画布 |
 | 2 | 打开项目 | Ctrl+Shift+O | 读 .anno（图片+标注+图层） |
-| 3 | 打开本地图片 | Ctrl+O | |
-| 4 | 导入剪贴板 | Ctrl+V | 读剪贴板图片加载（最常用入口） |
+| 3 | 打开本地图片 | Ctrl+O | 可选「作为主图」或「作为新图层元素」插入（v2.x） |
+| 4 | 导入剪贴板 | Ctrl+V | 读剪贴板图片加载（最常用入口），同样支持两种插入方式 |
 | 5 | 保存项目 | Ctrl+Shift+S | 存 .anno（图片+标注+图层） |
 | 6 | 导出（下拉） | Ctrl+S | 下拉菜单可选 **PNG / JPG / GIF / BMP / TIF / TIFF**（v1.7 多格式，记忆上次格式；图标为「向下箭头入托盘」，与保存项目软盘区分）；原独立导出按钮已取消 |
 | 7 | 复制全部到剪贴板 | Ctrl+C | 渲染「图片+标注」到系统剪贴板 |
-| 8 | 撤销 / 重试 | Ctrl+Z / Ctrl+Y | |
+| 8 | 撤销 ↶ / 重做 ↷ | Ctrl+Z / Ctrl+Y | v2.0 改为 Windows 风格弯箭头符号按钮（32×28，Segoe UI Symbol）；QAction 仍承担快捷键与启用态，符号按钮点击即 `act_undo/act_redo.trigger()` |
 | 9 | 删除选中 | Delete | |
 | 10 | 删除全部 | — | 清空画布全部标注 |
 | 11 | 100% 显示 | — | 点击 `canvas.actual_size()` 回到 scale=1 原始分辨率居中 |
 | 12 | 对齐 | — | 一键自动布局（`canvas.auto_layout`） |
 | 13 | 主题 ☀️/🌙 | — | 明/暗主题切换（暗黑态显示 ☀️、明亮态显示 🌙） |
-| 14 | 关于（右对齐） | — | 绿底白字，位于退出按钮左侧（工具栏倒数第二），点击弹「关于 图片快速标注工具 v1.7」（作者 redmoonk / 版权 © bk100 / 功能说明） |
+| 14 | 关于（右对齐） | — | 绿底白字，位于退出按钮左侧（工具栏倒数第二），点击弹「关于 图片标注大师 v2.0」（窗口标题为「图片快速标注工具 v2.0」，正文标题与版本同为 v2.0；作者 redmoonk / 版权 © bk100）；v2.0 起左侧内嵌 `明亮.png` / `暗黑.png` 二维码，随当前明暗主题切换 |
 | 15 | 退出（右对齐） | — | 红底白字，工具栏**最右端**（前置 Expanding 弹簧实现右对齐）；先 `_persist_settings()` 保存参数、`_do_autosave()` 保存当前工作，再隐藏托盘并 `QApplication.quit()` 完全退出（区别于点窗口关闭只是隐藏到托盘） |
 | — | 自由截图 ✂️ | Ctrl+Q（可在「截图设置」用 QKeySequenceEdit 自定义，清空禁用） | 隐藏主窗口→全屏框选→按设置复制剪贴板/载入画布，见 §18 |
 
@@ -317,16 +327,20 @@ QToolButton 标题（箭头 Right/Down）+ 可折叠内容区。**标题三色�
 
 ---
 
-## 10. 左侧面板（历史 + 图层）与左侧浮动按钮
+## 10. 左侧面板（图层结构树）与左侧浮动按钮
 
 - 左侧 `left_box` 宽度由水平 QSplitter 拖动调节（最小 150），拖动时 `_on_splitter_moved` 记录 `_left_panel_width` 并持久化。
 - 仅**左侧**有一个半透明圆形浮动按钮 `left_floating`（挂在 central 上，`_update_left_floating_pos` 定位到左面板右缘中部），点击 `_toggle_left_panel` 在显示/隐藏间切换：隐藏时把 left_box 最大/最小宽都设 0（**真正让出空间给画布**），展开时恢复记录的宽度。状态 `_left_panel_expanded`、宽度 `_left_panel_width` 都存 settings。
-- **HistoryPanel**：顶部显示当前项目名（未保存为「新图片」，`set_project_name`）；列表按创建顺序，单击选中、双击编辑文字、右键（编辑文字 / 引线额外有 编辑序号/上移/下移 / 删除）。
-- **LayerPanel**：`+/-` 按钮增删层、↑/↓ 移层；勾选框控制显隐；列表支持**拖拽排序**（显示顶层在上，提交时 reversed 回底层在前）；右键菜单：设为当前层 / 重命名（**不可重名**，QInputDialog 循环校验）/ 选中本层全部元素 / 删除 / 上移一层 / 下移一层 / **置为顶层 / 置为底层**（一步到位，等价连续上/下移到底，已在对应边缘时禁用）/ 展开折叠此层。
-  - **图层行拖拽 = 确定性重排（r31 重构）**：不再依赖 QTreeWidget 父类 dropEvent（旧实现把图层拖到另一行「行内」时会嵌套成子节点、且 dropEvent 内同步叠放顺序的调用因对象类型不符被 try/except 静默吞掉）。现由 `_LayerTreeWidget._manual_layer_reorder()` 自行 take/insert 顶层节点：拖到目标层**上方/下方指示符**即插到相邻行；落在行内（OnItem）按鼠标位于该行上/下半区分流；拖到某层的元素子行则插到其父层前/后；拖到空白移到最末。效果与多次点「上移/下移图层」完全一致，且**保证图层永不嵌套**；重排后经新增的 `layerOrderEdited` 信号（singleShot 0 延迟）交面板 `_emit_layer_order_from_tree()` 同步画布叠放。
-  - 列表刷新必须**增量更新**（复用 QListWidgetItem，禁止 clear 重建，否则信号派发中销毁 item 会触发 0xC0000409 崩溃）。
+- **LayerTreePanel（layer_tree_panel.py，取代旧 HistoryPanel + LayerPanel）**：左侧只有这一棵「图层 → 元素」两级结构树，顶层为图层、子行为该层全部元素；顶部按钮 `+` / `−` / `↑` / `↓` / `⊟ 展开全部` / `⊞ 折叠全部`。
+  - **图层右键**：设为当前层 / 重命名（**不可重名**，QInputDialog 循环校验）/ 选中本层全部元素 / 上移一层 / 下移一层 / **置为顶层 / 置为底层**（一步到位，已在对应边缘时禁用）/ 折叠或展开此图层 / **复制层**（连同该层全部元素深拷贝，副本插入原图层正上方并设为当前层，元素重新分配 id）/ 删除图层。
+  - **空白处右键（v2.x）**：新增层 / 折叠层 / 展开层。
+  - **元素右键**：编辑文字 / 编辑序号…（引线）/ 移动到图层（子菜单）/ 上移、下移（引线）/ 删除；元素也可直接拖到任意图层的子行改变归属。
+  - 元素节点文字为 `序号. 符号【类型】(参数) 内容`，**每个图层独立从 1 起排**（v1.7）；颜色按类型区分，明暗主题各一套。
+  - **图层行拖拽 = 确定性重排（r31 重构）**：不再依赖 QTreeWidget 父类 dropEvent（旧实现把图层拖到另一行「行内」时会嵌套成子节点、且 dropEvent 内同步叠放顺序的调用因对象类型不符被 try/except 静默吞掉）。现由 `_LayerTreeWidget._manual_layer_reorder()` 自行 take/insert 顶层节点：拖到目标层**上方/下方指示符**即插到相邻行；落在行内（OnItem）按鼠标位于该行上/下半区分流；拖到某层的元素子行则插到其父层前/后；拖到空白移到最末。效果与多次点「上移/下移图层」完全一致，且**保证图层永不嵌套**；重排后经 `layerOrderEdited` 信号（singleShot 0 延迟）交面板 `_emit_layer_order_from_tree()` 同步画布叠放。
+  - 列表刷新必须**增量更新**（复用 QTreeWidgetItem，禁止 clear 重建，否则信号派发中销毁 item 会触发 0xC0000409 崩溃）。
   - 选中某图层时，画布 `select_layer_items` 醒目选中该层全部元素。
   - **选中图层整体虚线高亮**：点选图层（`select_layer`）或右键「选中本层全部元素」（`select_layer_items`）会置 `canvas.highlight_layer_id`；paintEvent 在元素绘制后调 `_paint_layer_highlight`，对该层所有可见元素的 `export_bounds()` 求并集，画一条橙色（#FF7A00）DashLine 虚线外框（图片坐标系，外扩 2px）。该高亮只在屏幕绘制路径，**不进入 render_export 导出**；初始/加载/打开项目/恢复时 highlight_layer_id=None 不高亮。
+- 旧版 `layers_panel.py`（扁平图层面板）与 `history_panel.py`（元素历史列表）已不再挂载到主窗口（`tests/regression_r25_layer_tree.py` 断言 window 不再有 `layers_panel` 属性），仅作为历史实现保留。
 
 **v1.5（r25–r27，图层结构树大幅升级）**：
 - **元素↔图层拖放不闪退**：`_LayerTreeWidget` 内 `_in_drop` 标志 + `dropFinished` 信号；dropEvent 内元素改归属改 `QTimer.singleShot(0)` 延迟发射 `itemMovedToLayer`；refresh() 在 `_in_drop` 时挂起到 `_pending_refresh`，`_on_tree_drop_finished` 后 `singleShot(0)` 补刷；`_on_rows_moved`（图层拖拽重排）同样 `singleShot(0)` 延迟发 `requestReorder`。**根因**：dropEvent/rowsMoved 信号派发期间同步刷新树会销毁节点 → Qt 0xC0000409 闪退。
@@ -369,11 +383,12 @@ QToolButton 标题（箭头 Right/Down）+ 可折叠内容区。**标题三色�
 颜色统一存 `[r,g,b,a]`。
 - leader：`type,target[2],text_point[2],content,line_color,line_width,arrow_size,endpoint_style,label_style,above_dir,number,number_fmt,font_size,text_color,font_family,font_weight,font_italic,script,bg_enabled,bg_fill_color,bg_border_color,layer_id`
 - text：`type,pos[2],content,font_size,text_color,font_*,script,bg_*,layer_id`
-- shape：`type,p1[2],p2[2],shape,border_color,fill_color,line_width,layer_id`；r23 起多点折线额外写 `line_points[[x,y]...]`（仅直线且顶点≥3；两点直线不写、向后兼容，恢复时 p1/p2 为首尾点）
+- shape：`type,p1[2],p2[2],shape,border_color,fill_color,line_width,rotation,content,text_pos,font_size,text_color,font_family,font_weight,font_italic,script,tail_x,tail_len[,tail_apex][,line_points]`；`rotation` 为 v1.7 起的旋转角度，`content/text_pos` 为 v2.0 形状内嵌文字与垂直位置；`tail_x/tail_len` 为旧版比例尾巴（继续写出以兼容旧版读取），v2.1 新增绝对尾尖 `tail_apex`；r23 起多点折线额外写 `line_points[[x,y]...]`（仅直线且顶点≥3；两点直线不写、向后兼容，恢复时 p1/p2 为首尾点）
 - pen：`type,points[[x,y]...],pen_color,pen_width,layer_id`
 - highlight：`type,points[[x,y]...],hl_color[r,g,b,a],hl_width,hl_alpha,layer_id`
 - mosaic：`type,p1[2],p2[2],block_size,show_border,layer_id`（不存原图，恢复后绘制时惰性注入；旧档无 show_border 时默认 True）
-- emoji：`type,pos[2],emoji,font_size,layer_id`
+- emoji：`type,pos[2],emoji,font_size,rotation,layer_id`
+- image：`type,p1[2],p2[2],data(base64 PNG),rotation,layer_id`（v2.x 图片元素，像素内容直接内嵌）
 反序列化全程 try/except 跳过坏条目；字号经正数兜底 lambda；图层按「旧 id→新 id 映射」重新归属。
 - `.anno` 项目文件：保存项目时把图片（base64/字节）+ items + layers 打包；读取用对应编码，**不要假设它是 utf-8 纯 JSON**。
 
@@ -387,14 +402,14 @@ QToolButton 标题（箭头 Right/Down）+ 可折叠内容区。**标题三色�
    - `transparent_bg=True` 时用 `Format_ARGB32` 并先 fill transparent——只有「**超出原图的扩展区域**」透明，原图区域仍是原图；
    - 各标注的**文字背景框**：未启用则透明，启用则按所选 bg_fill_color 画。
 3. 非透明：扩展区填画布背景色 `_bg_color`，未扩展区填白，再画原图。
-4. `_paint_layers_export` 按图层顺序绘制、跳过隐藏层。
+4. `_paint_layers_export` 按图层顺序绘制、跳过隐藏层；存在马赛克时与屏幕路径一致，用 `flatten.BelowFlattener` 边画边合成「下方全部内容」，马赛克取该快照打码（含导入截图等下层元素）。
 5. 画布背景色支持在「画布设置」选透明；导出 PNG 才保留 alpha，JPG 不支持透明。
 
 ---
 
 ## 13. 系统托盘 / 窗口行为
 
-- 启动 `_center_on_screen()` 居中；窗口/任务栏图标用 1.ico。
+- 启动 `_center_on_screen()` 居中；窗口/任务栏图标优先 1.ico（缺失回退 2.ico）。
 - `QSystemTrayIcon`：点关闭按钮（closeEvent）或最小化（changeEvent）都**隐藏到任务栏托盘**（不退出），并气泡提示；单击托盘图标 `_on_tray_activated` 在显示/隐藏间切换；真正退出走托盘菜单 `_quit_app()`。**关闭到托盘与真正退出都会先 `_persist_settings()` 保存全部设置**（注意类里只能有一个生效的 closeEvent，历史上曾出现“托盘版 closeEvent 覆盖了保存版”导致设置从不落盘的 bug）。
 
 ---
@@ -410,6 +425,9 @@ Qt Windows 样式插件内置 PNG 带不标准 sRGB profile，首次展开折叠
 | 常量 | 值 | 位置/含义 |
 |---|---|---|
 | TOOL_BTN_SIZE | 38 | 模式按钮正方形边长、面板最小宽/高 |
+| 分隔条宽度 | 6px（v2.0） | 主水平 QSplitter.setHandleWidth，便于拖拽调面板宽度 |
+| 形状总数 | 69 种 / 7 大类（v2.1） | items.SHAPE_OPTIONS / SHAPE_CATEGORY_ORDER |
+| 标注尾尖控制点 | 黄色菱形 #FFE14D、半对角约 1.4×5/scale | canvas._paint_shape_handles（随旋转） |
 | TEXT_PAD_X / Y | 7 / 4 | 文字块左右/上下内边距 |
 | middle_text 固定横线 | 15px | 文字在线中间 |
 | no_line 固定横线 | 1px | 无横线模式 |
@@ -448,10 +466,12 @@ Qt Windows 样式插件内置 PNG 带不标准 sRGB profile，首次展开折叠
 13. 工具面板里“自由截图”是**即时动作不是模式**：按钮 `setCheckable(False)`、点击直接 `start_screenshot()`，并在 `_apply_mode_button_styles` 中跳过，避免把 canvas.mode 置成未知值。
 14. **QToolBar/QDockWidget 构造不会自动设置 objectName**：PyQt6 中 `QToolBar("主工具栏")` / `QDockWidget("工具面板")` 只设 windowTitle，objectName 为空 → `QMainWindow.saveState()` 打印 `'objectName' not set for QToolBar/QDockWidget ...` 警告，且该停靠布局无法随 settings 恢复。必须显式 `setObjectName`（主工具栏 `main_toolbar`、tool_dock `tool_dock`）。
 15. **save_project 的 style 颜色转换必须覆盖全部 QColor 字段**：current_style 每新增一个颜色字段（如荧光笔 `hl_color`），若漏同步到 `save_project` 的颜色转换，`json.dumps` 抛 `TypeError: Object of type QColor is not JSON serializable` → 保存失败、`.anno` 只有 image.png 没有 project.json。v1.7 改为 `_deep_color_hex()` **递归**转换任意嵌套的 QColor（dict/list 混合），后续新增颜色字段无需再维护转换元组；保存改为「JSON 先完整序列化 → tempfile 临时文件写 zip → os.replace 原子替换」，任何一步失败都不会留下残缺 .anno；打开侧 `zipfile.is_zipfile` 检查 + 缺 project.json 时降级只加载图片并明确提示（正是用户「图3 无法打开项目」报错的根治）。
-16. **直线不能用归一化矩形对角线（r23 修复）**：`shape_path("line", QRectF(p1,p2).normalized())` 恒画「左上→右下」对角线，当用户往右上/左下拖（"/" 方向）时画成另一条对角线、根本不经过按下点，表现为起点乱跑。直线一律按真实顶点 `moveTo(p1)→lineTo(p2)`（多点折线逐段），包围盒/选中框才用 normalized bbox。r23 起直线改为**点击式连续折线**（非拖拽）：按下只追加顶点、跟随段在 mouseMove（hover 也要响应，不能要求 buttons&LeftButton）里更新；Esc/回车/双击结束时只丢弃 `_line_cursor` 未确认段、保留 `_line_points`，且**不调用 `_cancel_pending()`**（那会切回选择工具）。canvas.py/items.py 为 CRLF，Edit 工具对其必报 Native execution failed，改它们用 tests/_patch_*.py 按 `\r\n` 拼接、assert 替换次数、utf-8 bytes 写回。
+16. **直线不能用归一化矩形对角线（r23 修复）**：`shape_path("line", QRectF(p1,p2).normalized())` 恒画「左上→右下」对角线，当用户往右上/左下拖（"/" 方向）时画成另一条对角线、根本不经过按下点，表现为起点乱跑。直线一律按真实顶点 `moveTo(p1)→lineTo(p2)`（多点折线逐段），包围盒/选中框才用 normalized bbox。r23 起直线改为**点击式连续折线**（非拖拽）：按下只追加顶点、跟随段在 mouseMove（hover 也要响应，不能要求 buttons&LeftButton）里更新；Esc/回车/双击结束时只丢弃 `_line_cursor` 未确认段、保留 `_line_points`，且**不调用 `_cancel_pending()`**（那会切回选择工具）。**换行符实测（2026-11，逐字节统计每个 `\n` 前是否为 `\r`）**：纯 LF 共 **12 个**——annotator/ 下 11 个（autosave.py、callout_geom.py、flatten.py、items.py、layer_tree_panel.py、menu_qss.py、panel.py、rulers.py、screenshot.py、window.py、`__init__.py`）+ 根目录 main.py；纯 CRLF 共 2 个——`history_panel.py`（136 行）、`layers_panel.py`（191 行）；**混合的 2 个**——`canvas.py`（3136 个 `\n`，其中仅第 27/28/29 行 3 个为 CRLF，即 `RBTN_LONG_MS` 常量及其注释块）、`settings.py`（50 个 `\n`，其中第 50 行 1 个为 CRLF）。因此**不存在“canvas.py/items.py 统一为 CRLF”**：items.py 全文是 LF。上述结论均用 `[IO.File]::ReadAllBytes` 按字节读取得出，**文件按字节级入库、未触发任何换行转换**；改任何 .py 都必须**按原始字节读、按原始字节写**，只替换目标片段，不要整篇转 LF/CRLF、不要让编辑器重排换行；历史 `tests/_patch_*.py` 的 `\r\n` 拼接写法只适用于 history_panel.py / layers_panel.py 这两个纯 CRLF 文件。
 17. **copy.deepcopy 会保留元素原 id（v1.5 关键坑）**：`duplicate_item` 克隆后不重新分配 id，画布会出现两个同 id 元素——树按 id 去重只显示 1 个、`deduplicate_items()` 会把它当重复误删，正是用户截图「主界面 2 个表情、结果树 3 个」的根因。克隆后必须 `new_item.id = allocate_item_id()`（items.py 末尾模块级函数）。undo 快照不受影响（快照整体恢复、不同时共存）。
 18. **拖放/排序信号派发期间禁止同步刷新树（v1.5 闪退根因）**：QTreeWidget 的 dropEvent / rowsMoved 派发中若同步 refresh 销毁节点，Qt 直接 0xC0000409 崩溃（无 Python traceback）。统一 `_in_drop` 挂起 + `QTimer.singleShot(0)` 延迟发射信号/补刷。**不熟 PyQt6 勿改 dropEvent 相关代码**。
 19. **PyQt6 QMenu.addAction 重载顺序是 `(text, shortcut, slot)`**：写成 `(text, slot, shortcut)` 会按 ConnectionType 解析抛 TypeError；带快捷键菜单项一律 `menu.addAction("文本", "Ctrl+X", handler)`。
+20. **打包产物名以 spec `name` 为准，`一键打包.py` 的检查常量仍是旧名**：`图片标注工具.spec` 的 `exe name='图片标注大师'`，实际产物为 `dist\图片标注大师.exe`；而 `一键打包.py` 的 `DIST_EXE` 仍指向 `dist\图片标注工具.exe`，打包成功后必然走「未找到产物」告警分支（不影响 exe 生成）。改动任一侧时需两边同步，否则会出现「明明打包成功却提示失败」。
+21. **带父控件的 QMenu 不继承应用级/窗口级 QSS**：暗黑主题下右键菜单会落回原生浅色底。所有右键菜单弹出前必须 `menu_qss.apply_menu_theme(menu, self._dark_theme)`（`layer_tree_panel` / `window` 两处面板菜单 / `canvas` 分类菜单均如此），不能只依赖 `QApplication` 样式表。该逻辑已抽到 `menu_qss.py`，新增菜单直接复用即可。
 
 ---
 
@@ -459,11 +479,11 @@ Qt Windows 样式插件内置 PNG 带不标准 sRGB profile，首次展开折叠
 
 新增一个“绘制类模式 + 画布元素 + 右侧设置组 + 持久化”需固定触碰 6 处（照此清单可 100% 复刻）：
 1. **items.py 末尾追加元素类**：实现 `text_rect()/paint(painter,export=False)/hit_test(pos,tol)/move_by(dx,dy,part)/export_bounds()`；需要选中框就调基类 `paint_selection(painter,rect)`；字体一律 setPixelSize。
-2. **canvas.py**：加 MODE 常量；`__init__` 临时状态；set_mode 清理状态/光标；mousePress/Move/Release 分支；`_paint_preview` 预览；`add_xxx_item` 工厂（内部 `item.layer_id=self.current_layer` 后 append）；`apply_style_to_all` 分支；`_paint_layers/_paint_layers_export`（马赛克在此惰性注入原图）。
+2. **canvas.py**：加 MODE 常量；`__init__` 临时状态；set_mode 清理状态/光标；mousePress/Move/Release 分支；`_paint_preview` 预览；`add_xxx_item` 工厂（内部 `item.layer_id=self.current_layer` 后 append）；`apply_style_to_all` 分支；`_paint_layers/_paint_layers_export`（马赛克在此惰性注入马赛克源：底图或 `BelowFlattener` 的「下方内容」快照）。
 3. **panel.py**：在 g_exp 之前 addWidget 新 CollapsibleBox 并注册 `_groups`；current_style 加字段；控件信号连 `_on_style_changed`；颜色走 `_pick_color`；`_apply_to_selection/sync_from_selection/set_style` 三处加该元素分支。
 4. **window.py**：import MODE 常量；mode_btn_styles/mode_btn_tooltips；MODE_GROUP 映射；`_mode_name` 补中文名（.get 兜底）。
 5. **autosave.py**：serialize/deserialize 成对分支，颜色存 [r,g,b,a]，马赛克不存原图。
-6. **history_panel.py**：`_describe` 加中文名；无文字内容元素的 kind 白名单。
+6. **layer_tree_panel.py**：`_describe_item` 加中文名/符号；无文字内容元素的 kind 白名单（`_ITEM_KIND_LABELS`/`_KIND_GLYPH`）。
 
 新建元素统一：坐标用图片坐标；工厂里设 `layer_id`、append 后由调用方 `push_undo("add")`、`selected=True`、`emit itemSelectionChanged`。最小成立阈值：形状/画笔/马赛克归一宽高 >3/scale；荧光笔轨迹≥1 点即成立。
 
@@ -516,9 +536,9 @@ Qt Windows 样式插件内置 PNG 带不标准 sRGB profile，首次展开折叠
 2. `_show_screenshot_overlay()`：`pick_screen_at_cursor()` 取光标所在屏幕（兜底主屏）→ 创建 `ScreenshotOverlay(screen)`，连 captured/canceled → `showFullScreen + raise_ + activateWindow`。
 3. **ScreenshotOverlay**（FramelessWindowHint|WindowStaysOnTopHint|Tool，WindowFullScreen，setGeometry=屏幕逻辑几何）：`__init__` 先 `screen.grabWindow(0)` 预抓整屏作背景，**保留原生物理像素与其 DPR、不做任何缩放预处理**（缩放会让遮罩背景比真实屏幕粗糙；绘制时 Qt 依 DPR 把物理像素 1:1 映射到屏幕，遮罩背景与真实桌面同样清晰）；鼠标按下记起点、移动更新选区、`paintEvent` 画「整屏背景(QPoint 直绘) + 半透明黑遮罩(alpha=110)，**选区内用 `setClipRect(rect)+drawPixmap(0,0,bg)` 直绘恢复清晰**（必须用裁剪+QPoint 直绘；`drawPixmap(目标矩形,bg,源矩形)` 矩形重载在 Qt 里走缩放 blit 会轻微柔化）+ 蓝框」，并由 `_draw_magnifier` 在**选区外侧**（优先正上方、空间不足翻下方、再不够贴边）画一个 132px、3× 的放大镜方块（十字线+蓝点对准鼠标拖动末端 `_cur`，采样原生底图所以也更锐利）与其右侧信息面板（鼠标 X/Y、起点 X/Y、选区宽×高、放大倍数）；松开（选区≥5px）调 `_capture`，否则/Esc 取消。常量 `_MAG_ZOOM/_MAG_BOX/_MAG_INFO_W`。
 4. `_capture(local_rect)`：**不再二次 `grabWindow`**（松开时遮罩仍覆盖屏幕，再截屏会拍到半透明遮罩和被处理过的背景，偏色又模糊）。改为从 `__init__` 抓到的**原生整屏底图 `self._bg` 中按物理像素 1:1 裁剪**：逻辑选区乘底图 DPR 得物理 QRect，`bg.copy(physRect)`（纯像素拷贝、零重采样），再 `setDevicePixelRatio(1.0)` 输出。结果就是遮罩弹出前的显示器真实画面、原生最高分辨率（150% 缩放时逻辑 500×360 → 物理 750×540），且画布 drawPixmap 与外框尺寸一致（不会外框比截图大一圈）；随后 emit `captured(QPixmap)` → close。
-5. `_on_screenshot_captured(pm)`：按勾选复制到 `QGuiApplication.clipboard()`、`canvas.load_pixmap(pm, fit=False)` 按**原始分辨率 100%** 载入画布（r23，不自动放大铺满；顶部「100%」按钮可随时回到该状态）；finally `_restore_after_screenshot()`（清 overlay 引用、showNormal/raise/activate 恢复主窗口）。取消走 `_on_screenshot_canceled`，同样恢复窗口。
+5. `_on_screenshot_captured(pm)`：先 `_apply_screenshot_border(pm)` 按「截图设置」加边框（勾选「无边框」时跳过，默认无边框）→ 按勾选复制到 `QGuiApplication.clipboard()` → 若勾选「载入画布」：**没有主图且没有元素时**按原始分辨率 100% 载入为主图（r23，不自动放大铺满，顶部「100%」按钮可随时回到该状态），**已有主图或已有元素时**作为 `ImageItem` 新图层元素插入（可缩放/旋转/移动，v2.x）；插入延迟 80ms 等窗口激活；finally `_restore_after_screenshot()`（清 overlay 引用、showNormal/raise/activate 恢复主窗口）。取消走 `_on_screenshot_canceled`，同样恢复窗口。
 
-**设置持久化**：screenshot_shortcut / screenshot_clipboard / screenshot_canvas 走 panel.current_style→settings.json 的 style，set_style 回填。截图是全局屏幕动作而非 items 元素，**不进 autosave 元素序列化、不进撤销栈**。
+**设置持久化**：screenshot_shortcut / screenshot_clipboard / screenshot_canvas / screenshot_border_w / screenshot_no_border / screenshot_border_color 走 panel.current_style→settings.json 的 style，set_style 回填。截图是全局屏幕动作而非 items 元素，**不进 autosave 元素序列化、不进撤销栈**（作为 `ImageItem` 插入后才是普通元素）。
 
 ---
 
@@ -613,3 +633,85 @@ Qt Windows 样式插件内置 PNG 带不标准 sRGB profile，首次展开折叠
 - 修复：先 `moveTo` 外弧起点；外弧 45°→315°（270°，开口朝右）→ 端面线 → 52% 内圈反向弧 → 闭合，形成粗 C 形弧带；方形/扁/高外框均正确，路径严格落在外框内，环带可命中、内孔不命中（无填充时）。
 
 **验证**：新增 `tests/regression_r31_layer_reorder_toolembed.py`（55+ 断言：右键置顶/置底与禁用态、六种拖拽位置与「拖拽=多次上移」等价性、无嵌套、工具面板七种摆放互转与分栏顺序、持久化往返恢复、空心弧几何/命中/绘制）全过；r26/r28/r29/r30 既有回归 PASS；离屏渲染 `tests/_r31_inner_left.png`、`_r31_inner_right.png`、`_r31_openarc.png` 人工核验。r23/smoke_v17/r25 的个别失败为 v2.0 既有漂移（按钮符号化、`【】`标签格式、形状手柄返回值数量变化），与本轮改动无关。
+
+---
+
+## 22. v2.0 更新记录（5 项需求 + 同批 v2.x，全量回归通过）
+
+**① 形状内嵌文字（含直线，需求5）**（items.py + canvas.py + panel.py + autosave.py）
+- 结论：矩形/椭圆/多边形/标注/直线等**全部形状**都能写字，选中后双击本体就地编辑。
+- 实现：`ShapeItem` 直接复用 `AnnotationItem` 的文字字段（`text_content/font_size/text_color/font_family/font_weight/font_italic/script`），新增 `text_pos ∈ center/top/bottom`；`paint()` 末尾调 `_paint_shape_text()`，以 `rect().adjusted(4,4,-4,-4)` 为绘制区、`AlignHCenter` + 对应 `AlignTop/VCenter/Bottom` + `TextWordWrap`，因此文字**随形状旋转、随缩放在包围盒内重排**。双击入口在 `canvas.mouseDoubleClickEvent`：前两轮先判文字/引线，未命中时新增第三轮 `isinstance(item, ShapeItem) and hit_test(...)=="body"` → `start_inline_editor(item.edit_anchor(), ..., allow_empty=True)`（`edit_anchor()` = 包围盒中心）。面板「形状设置」新增「文字位置」下拉，映射 `0/1/2 → center/top/bottom`，与 `current_style.shape_text_pos`、`_apply_to_selection`、`sync_from_selection`、`set_style` 四处同步。autosave 的 shape 分支写出 `content/text_pos/font_*`，旧档无这些字段时默认空文本/居中。
+- 验证：离屏渲染核验三种垂直位置与旋转后的文字位置；`regression_r29.py`（形状面板七分类）与 `smoke_test_v17.py` 全过，确认没有破坏原有形状手柄/旋转/缩放。
+
+**② Office 风格形状库扩充（需求5）**（items.py + panel.py）
+- 结论：形状从 11 种扩到 24 种（左/上/下/左右/上下箭头、心形、云朵、平行四边形、梯形、四角星、月牙、对话气泡、十字），并把形状面板改成 **7 大类折叠网格**。
+- 实现：新增 `SHAPE_OPTIONS_PRIMARY`（常用 12 个，默认展开）与 `SHAPE_OPTIONS_MORE`；`SHAPE_CATEGORY_ORDER` 按存储值归入「基本形状/箭头汇总/公式形状/流程图/星与旗帜/标注/括号」，`shape_categories()` 保证每个形状恰好出现一次，**漏归类的新形状自动补进「基本形状」**，显示名统一从 `SHAPE_OPTIONS` 反查、不重复维护。面板用 `QToolButton`（30×30，`shape_icon(val,24)` 生成缩略图）+ 灰色可折叠分类标题，点击即选形状并触发 `_on_style_changed`。
+- 验证：`regression_r29.py`「形状面板七分类」断言各类数量与覆盖完整性；每种形状经 `shape_path` 离屏绘制核验无异常。
+
+**③ 撤销/重做改为 ↶/↷ 符号（需求）**（window.py）
+- 结论：工具栏撤销/重做改为 Windows 风格弯箭头符号按钮，语义一眼可辨，快捷键与按钮启用态保持一致。
+- 实现：新增两个 `QPushButton("↶"/"↷")`（32×28，`Segoe UI Symbol` 15px），点击转调 `act_undo/act_redo.trigger()`；QAction 继续承担 `Ctrl+Z/Ctrl+Y` 快捷键与 enabled 状态（`_update_action_states()` 按 `canvas.can_undo()/can_redo()` 同步 QAction 与两个符号按钮的可用态），因此快捷键、菜单项、按钮三处行为一致。
+- 验证：`smoke_test_v17.py`（撤销/重做恢复旋转、层拖动）全过；主界面离屏渲染确认符号显示完整、禁用态变灰。
+
+**④ 分隔条加宽（需求4）**（window.py）
+- 根因：左右分栏分隔条过窄，拖动调面板宽度时容易误触面板内的数值滑动条。
+- 实现：`self.splitter.setHandleWidth(6)`；并只在 `splitter.handle(i)` 上设 `SplitHCursor`（不设在 splitter 本身，避免光标传播到右侧面板所有子控件）。左/中/右三栏宽度仍由 `setSizes([240,900,260])` 与持久化的 `splitter_state` 控制。
+- 验证：代码核对 `setHandleWidth(6)` 与 handle 光标设置；主界面离屏渲染确认分隔条加宽后左右面板宽度拖动正常、面板内数值滑条不再被误触。
+
+**⑤ 关于页二维码（需求6）**（window.py + 图片标注工具.spec + 明亮.png/暗黑.png）
+- 结论：关于对话框左侧显示二维码，明亮主题用 `明亮.png`、暗黑主题用 `暗黑.png`。
+- 实现：`_show_about()` 取 `self._dark_theme` 选图，`QLabel` 固定 168×168、白底细边框，图片按 `KeepAspectRatio` 缩到 160；用 `open(...,"rb") + QPixmap.loadFromData` 读取（规避中文路径下 `QPixmap(path)` 偶发失败），搜索顺序为 `sys._MEIPASS`（打包内嵌）→ `settings._app_base_dir()`（exe 目录/源码目录）→ 另一主题图；全找不到时文字显示「二维码」。spec `datas` 已加入两张 png，打包后无需外部文件。对话框标题「关于 图片标注大师 v2.0」，正文标题/版本均为 v2.0。
+- 验证：源码运行下明/暗主题各打开一次关于页核验取图正确；spec `datas` 已包含两张 png，打包产物可从 `_MEIPASS` 加载。
+
+**⑥ 同批 v2.x 需求（代码注释标记 v2.x）**（panel.py + canvas.py + layer_tree_panel.py）
+- **形状边线/填充透明**：面板在颜色按钮旁各加「透明」复选框，勾选时 `current_style` 输出 `alpha=0` 的颜色；`ShapeItem.paint` 遇 `border_color.alpha()==0` 用 `NoPen`、`fill_color.alpha()==0` 用 `NoBrush`（不再有「透明填充仍画一层」的残留）；透明态下按钮保留上次非透明色，取消勾选即恢复。引线颜色不受影响。
+- **右键「重复上次标注」**：`canvas._last_annotation_mode` 只在标注工具（引线/序号/文本/形状/画笔/荧光/马赛克/表情）切换时记录，选择模式不记录；右键菜单顶部新增该项，调用 `repeat_last_annotation()` 直接 `set_mode` 回上次标注工具，无可重复时状态栏提示。
+- **图层树右键增强**：空白处右键「新增层 / 折叠层 / 展开层」；图层节点右键新增「复制层」，`canvas.copy_layer()` 深拷贝该层全部元素 → 每个元素 `allocate_item_id()` 重新分配 id → 副本插入原层正上方并设为当前层（名称取「原层名 + 空格 + 副本」，重名自动追加序号），因此不会出现同 id 元素、也不会与去重逻辑冲突。
+- 验证：`tests/regression_v2x_three_features.py`（透明边线/填充与导出、引线不受影响、最近标注模式记录与菜单启用态、空白/图层右键菜单结构、复制层命名/归属/位置/id 唯一性/树同步）全过。
+
+**验证**：`tests/regression_v2x_three_features.py`、`tests/regression_r29.py`、`tests/smoke_test_v17.py` 全部 PASS；离屏渲染核验形状内嵌文字、7 类形状网格、↶/↷ 按钮与关于页二维码取图。
+
+---
+
+## 23. v2.1 更新记录（3 项需求 + 同批 v2.x 能力）
+
+**① 标注类形状黄色尾尖控制点（需求2）**（canvas.py + items.py + callout_geom.py + autosave.py）
+- 现象/根因：旧实现用 `tail_x/tail_len` 比例描述尾尖，尾尖只能沿固定边移动、角度与长度耦合，旋转后控制点与绘制位置容易错位；根点也总落在底边，尖点偏移时容易跑出轮廓或留缺口。
+- 实现：
+  1. `ShapeItem` 改存 `tail_apex`（**未旋转图片坐标**中的绝对尾尖），`set_tail_apex()` 不钳制、不改 p1/p2，主体尺寸恒定；`tail_x/tail_len` 仅用于旧存档迁移。
+  2. `_shape_handle_pts()` 在 8 缩放点 + 1 旋转点之后返回 `tail_pt`（`item.tail_tip()` 经同一 `_rot_pt` 随 `rotation` 旋转），`_hit_shape_handle()` 用 `10/scale` 容差返回 `(item,"tail",-2)`；`_paint_shape_handles()` 画 **黄色菱形 #FFE14D + 深黄描边 #B8860B**。
+  3. `_apply_tail_drag()` 把鼠标位置逆旋转回未旋转坐标系后**直接写入尾尖**，不做比例换算；缩放形状时 `start_geom["tail_apex"]` 按同一锚点/比例映射，`move_by` 时尾尖随主体平移。
+  4. `callout_geom.py` 负责落边：`nearest_edge()` 找最近边与投影参数，`edge_roots()` 令根心向边中点回收、根宽固定为边长 16% 并整体钳制在 `[6%,94%]`，`ellipse_roots()` 用椭圆参数方程 + 切向量取弧上两点，`default_apex()` 为新建默认（底边 30%、向下 25% 高度）。
+- 验证：`tests/regression_r29.py`（尾尖可自由拖出、随移动平移、随缩放映射、序列化往返、旧比例迁移）与 `tests/regression_r30_callout.py`（59 项：路径单一连续封闭、椭圆/云形根点严格贴边、尾部序列 root2→apex→root1、光栅化）全过。
+
+**② 更多 Office 形状（标注/卷轴/流程/旗帜/弧形箭头等）**（items.py + panel.py）
+- 结论：在 v2.0 的 24 种基础上再扩 **45 种，合计 69 种**：矩形/菱形/燕尾/上卷标注、横/竖卷轴、手动输入、卡片、太阳、弧形上/下箭头、左/右波形旗帜、空心弧、燕尾形、肘形/弧形箭头、圆环、七/八/十/十二边形、六/八/十六/二十四角星、爆炸形、文档/多文档/顺序存储、大括号/双括号、减乘除/等号/不等号、笑脸、闪电、剪角矩形、云形/椭圆标注等。
+- 实现：全部复用 `shape_path(shape, rect, tail=None)`；标注类 7 种进 `CALLOUT_SHAPES`（尾尖可拖动），非标注类按形状公式生成路径；`SHAPE_CATEGORY_ORDER` 同步补齐分类，面板网格自动出现新按钮；`shape_icon()` 用同一路径渲染缩略图，选中即写入 `shape_type`。
+- 验证：`regression_r29.py` 的七分类覆盖/数量断言 + `regression_r30_callout.py` 的路径连续性/贴边断言全过；离屏批量渲染 69 种形状无异常。
+
+**③ 工具面板摆放位置恢复**（window.py）
+- 结论：上次退出时的工具面板位置（最左/最右/上/下/浮动/嵌入左/嵌入右）在下次启动自动恢复。
+- 实现要点：内嵌分栏只在分栏已恢复成 4 列结构后才能按索引放回，因此 `_restore_settings()` 严格按 `window_geometry → main_state → splitter_state → tool_place` 顺序恢复，`tool_place` 用 `QTimer.singleShot(0, lambda: self._restore_tool_place(p))` 延后到事件循环（此时分栏/停靠已就绪）；`_restore_tool_place()` 校验 7 种合法值（float/top/bottom/dock-left/dock-right/inner-left/inner-right）后再调 `_place_tool()`，非法值保持当前默认。嵌入态持久化仍保存「干净 3 列」main/splitter 状态，避免下次 restore 失效。
+- 验证：`tests/regression_r31_layer_reorder_toolembed.py`（七种摆放互转、分栏顺序、持久化往返恢复）全过；重启后离屏截图核验回到上次摆放位置。
+
+**④ 同批 v2.x 能力（马赛克向下合成 / 图片元素 / 截图边框）**
+- **马赛克对「下方全部内容」打码（flatten.py，需求5）**：新增 `BelowFlattener`，在图片坐标系维护离屏 `QImage`，按叠放顺序把底图和每个元素（export 语义）画进去；每遇到马赛克先 `snapshot()` 取「其下方所有内容」的合成图作为打码源，再把马赛克本身画回离屏图供更上层使用——因此导入截图、下层标注都会被打码，屏幕与导出两条路径一致。稳定性：`snapshot()` 前先 `painter.end()`、转换后 `begin()` 并恢复 render hints（避免 Windows 光栅引擎「边画边转」崩溃）；离屏单边上限 `_MAX_DIM=16384`，分配失败时 `usable=False`，画布回退到「只对底图打码」。
+- **图片元素 ImageItem**：打开图片 / 粘贴 / 截图时，若画布已有主图和元素，`_ask_import_mode()` 询问「覆盖当前图片 / 导入为元素（新图层） / 取消」；选择元素则 `canvas.add_image_element()` 自动建「图片」图层、等比缩放到画布中心并选中，支持 8 点缩放/旋转/拖动；序列化为 base64 PNG，`__deepcopy__` 对 QPixmap 复用隐式共享引用。
+- **截图边框**：`_on_screenshot_captured` 先 `_apply_screenshot_border()`，按「无边框（默认勾选）/ 边框线宽 1–30 / 边框颜色」用 `MiterJoin` 在结果图内侧描边，再复制到剪贴板或载入画布。
+- 验证：`regression_r29.py`「马赛克向下合成」断言、`smoke_test_v17.py` 图片/项目存取往返全过；离屏渲染核验「图片元素 + 上层马赛克」打码范围正确。
+
+**验证**：本次升版仅改 README、未改动任何 .py 业务文件；以 `QT_QPA_PLATFORM=offscreen` 实跑 `tests/regression_v2x_three_features.py`、`tests/regression_r31_layer_reorder_toolembed.py`、`tests/smoke_test_v17.py`，全部 PASS；`regression_r29.py` / `regression_r30_callout.py` 针对尾尖与标注几何的专项断言全过。
+
+---
+
+## 24. v2.0 / v2.1 更新记录（测试与文档同步）
+
+**① 新增 callout_geom 纯几何单元测试**（tests/unit_callout_geom.py，新增文件，未改业务代码）
+- 覆盖 20 个测试函数 / 112 项断言：尾尖在主体内外、最近边选择、根点严格贴边与 `[6%,94%]` 钳制、0/90/180/270/任意角映射与等变关系、文字区与尾尖重叠（主体内不生成尾巴）、退化尺寸（宽/高为 0、边长 1e-12、退化椭圆）、左右/上下镜像对称、菱形斜边落点、默认尾尖与基础距离函数。
+- 纯逻辑测试：不创建 QApplication，只从 `PyQt6.QtCore` 引入 `QPointF/QRectF`；单个脚本独立运行，末尾 `sys.exit()` 干净退出。
+- 运行结果：`==== 全部 PASS（20 个测试函数 / 112 项断言） ====`。
+
+**② 对齐 smoke_test_v17 旧函数签名（断言未改）**（tests/smoke_test_v17.py，提交 280daac）
+- 原因：v2.1 起 `AnnotationCanvas._shape_handle_pts()` 的返回值由 2 元组变为 3 元组——`(缩放点列表, 旋转点, 尾尖点)`（见 §23①）。旧脚本 `pts, rh = cv._shape_handle_pts(sh)` 会在首个断言行直接抛 `ValueError: too many values to unpack`，脚本中断、后续断言全部不执行，看起来像功能回归。
+- 处理：只把两处解包改为 `pts, rh, _tail`，**断言数量、阈值与期望值一字未改**，从而把「接口返回值变更」与「业务行为回归」区分开；该条作为独立记录保留，便于后续追溯测试与接口的对应关系。
+- 验证：`tests/smoke_test_v17.py` 恢复全绿。
