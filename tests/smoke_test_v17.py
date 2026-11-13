@@ -51,7 +51,7 @@ app.processEvents()
 # ---------- 1. 形状手柄：选中后出现旋转/缩放点 ----------
 cv.select_item_by_id(sh.id)
 cv.update()
-pts, rh = cv._shape_handle_pts(sh)
+pts, rh, _tail = cv._shape_handle_pts(sh)
 check(len(pts) == 8, f"形状缩放手柄 8 个点（实际 {len(pts)}）")
 
 # 旋转：点击旋转点拖动 → rotation 变化且撤销栈新增
@@ -78,7 +78,7 @@ check(abs(sh.rotation - before_rot) < 1e-6, "撤销恢复原旋转")
 
 # 缩放：拖右下角点 → 尺寸变化（撤销会清空选中，重新选中）
 cv.select_item_by_id(sh.id)
-pts, rh = cv._shape_handle_pts(sh)
+pts, rh, _tail = cv._shape_handle_pts(sh)
 br = pts[4]  # 右下角点（宽高同时变化）
 w0, h0 = sh.rect().width(), sh.rect().height()
 bx, by = V(br.x(), br.y())
