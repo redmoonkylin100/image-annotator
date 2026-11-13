@@ -1,0 +1,28 @@
+# ---- 虚拟环境与构建产物 ----
+venv/
+build/
+dist/
+__pycache__/
+*.py[cod]
+
+# ---- 运行期数据 ----
+autosave/
+*.anno
+api_config.json
+
+# ---- 打包/调试日志 ----
+打包日志.txt
+_r*.log
+_r*.err
+_r*.txt
+
+# ---- 测试与调试截图 ----
+_r*.png
+round10_check.png
+tests/*.png
+tests/*.txt
+tests/*.log
+
+# ---- 临时文件 ----
+*.tmp
+*.bak
